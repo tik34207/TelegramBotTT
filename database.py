@@ -29,15 +29,6 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY,
-            country TEXT,
-            account TEXT,
-            retrieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            format TEXT
-        )
-    ''')
-    c.execute('''
         CREATE TABLE IF NOT EXISTS formats (
             id INTEGER PRIMARY KEY,
             format TEXT
@@ -76,7 +67,6 @@ def get_accounts(country, number):
     # Log the retrieval action and add to history
     for account in accounts:
         c.execute('INSERT INTO log (action, account_id) VALUES ("retrieve", ?)', (account[0],))
-        c.execute('INSERT INTO history (country, account, format) SELECT country, account, format FROM accounts WHERE id = ?', (account[0],))
         c.execute('DELETE FROM accounts WHERE id = ?', (account[0],))
     conn.commit()
     conn.close()
@@ -128,15 +118,8 @@ def get_stats():
     c.execute('SELECT COUNT(*) FROM accounts WHERE added_at >= ?', (start_month,))
     added_month = c.fetchone()[0]
 
-    c.execute('SELECT COUNT(*) FROM history WHERE retrieved_at >= ?', (start_day,))
-    retrieved_day = c.fetchone()[0]
-    c.execute('SELECT COUNT(*) FROM history WHERE retrieved_at >= ?', (start_week,))
-    retrieved_week = c.fetchone()[0]
-    c.execute('SELECT COUNT(*) FROM history WHERE retrieved_at >= ?', (start_month,))
-    retrieved_month = c.fetchone()[0]
-
     conn.close()
-    return f"Добавлено аккаунтов: День: {added_day}, Неделя: {added_week}, Месяц: {added_month}\nПолучено аккаунтов: День: {retrieved_day}, Неделя: {retrieved_week}, Месяц: {retrieved_month}"
+    return f"Добавлено аккаунтов: День: {added_day}, Неделя: {added_week}, Месяц: {added_month}"
 
 def get_account_dates(country):
     conn = sqlite3.connect('accounts.db')
@@ -162,23 +145,6 @@ def get_account_dates(country):
             "hours_since_last": hours_since_last
         }
     return None
-
-def get_history(country, page, per_page=10):
-    offset = (page - 1) * per_page
-    conn = sqlite3.connect('accounts.db')
-    c = conn.cursor()
-    c.execute('SELECT account FROM history WHERE country = ? ORDER BY retrieved_at DESC LIMIT ? OFFSET ?', (country, per_page, offset))
-    accounts = [row[0] for row in c.fetchall()]
-    conn.close()
-    return accounts
-
-def clean_old_history():
-    conn = sqlite3.connect('accounts.db')
-    c = conn.cursor()
-    three_days_ago = datetime.now() - timedelta(days=3)
-    c.execute('DELETE FROM history WHERE retrieved_at < ?', (three_days_ago,))
-    conn.commit()
-    conn.close()
 
 def add_format(format):
     conn = sqlite3.connect('accounts.db')
